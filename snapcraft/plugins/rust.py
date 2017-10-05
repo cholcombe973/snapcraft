@@ -1,4 +1,7 @@
+# -*- Mode:Python; indent-tabs-mode:nil; tab-width:4 -*-
+#
 # Copyright (C) 2016-2017 Marius Gripsgard (mariogrip@ubuntu.com)
+# Copyright (C) 2016-2017 Canonical Ltd
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
@@ -33,11 +36,15 @@ Additionally, this plugin uses the following plugin-specific keywords:
       Features used to build optional dependencies
 """
 
+import collections
 import os
 import shutil
+from contextlib import suppress
 
 import snapcraft
 from snapcraft import sources
+from snapcraft import shell_utils
+from snapcraft.internal import errors
 
 _RUSTUP = 'https://sh.rustup.rs'
 
@@ -76,8 +83,6 @@ class RustPlugin(snapcraft.BasePlugin):
         super().__init__(name, options, project)
         self.build_packages.extend([
             'gcc',
-            'binutils',
-            'libc6-dev',
             'git',
             'curl',
             'file',
@@ -86,12 +91,17 @@ class RustPlugin(snapcraft.BasePlugin):
         self._rustc = os.path.join(self._rustpath, "bin", "rustc")
         self._rustdoc = os.path.join(self._rustpath, "bin", "rustdoc")
         self._cargo = os.path.join(self._rustpath, "bin", "cargo")
+        self._cargo_dir = os.path.join(self.builddir, '.cargo')
         self._rustlib = os.path.join(self._rustpath, "lib")
         self._rustup_get = sources.Script(_RUSTUP, self._rustpath)
-        self._rustup = os.path.join(self._rustpath, "sh.rustup.rs")
+        self._rustup = os.path.join(self._rustpath, "rustup.sh")
+        self._manifest = collections.OrderedDict()
 
     def build(self):
         super().build()
+
+        self._write_cross_compile_config()
+
         cmd = [self._cargo, 'install',
                '-j{}'.format(self.parallel_build_count),
                '--root', self.installdir,
@@ -100,13 +110,70 @@ class RustPlugin(snapcraft.BasePlugin):
             cmd.append("--features")
             cmd.append(' '.join(self.options.rust_features))
         self.run(cmd, env=self._build_env())
+        self._record_manifest()
+
+    def _write_cross_compile_config(self):
+        if not self.project.is_cross_compiling:
+            return
+
+        # Cf. http://doc.crates.io/config.html
+        os.makedirs(self._cargo_dir, exist_ok=True)
+        with open(os.path.join(self._cargo_dir, 'config'), 'w') as f:
+            f.write('''
+                [build]
+                target = "{}"
+
+                [target.{}]
+                linker = "{}"
+                '''.format(self._target, self._target,
+                           '{}-gcc'.format(self.project.arch_triplet)))
+
+    def _record_manifest(self):
+        self._manifest['rustup-version'] = self.run_output(
+            [self._rustup, '--version'])
+        self._manifest['rustc-version'] = self.run_output(
+            [self._rustc, '--version'])
+        self._manifest['cargo-version'] = self.run_output(
+            [self._cargo, '--version'])
+        with suppress(FileNotFoundError, IsADirectoryError):
+            with open(os.path.join(self.builddir, 'Cargo.lock')) as lock_file:
+                self._manifest['cargo-lock-contents'] = lock_file.read()
+
+    def get_manifest(self):
+        return self._manifest
+
+    def enable_cross_compilation(self):
+        # Cf. rustc --print target-list
+        targets = {
+            'armhf': 'armv7-{}-{}eabihf',
+            'arm64': 'aarch64-{}-{}',
+            'i386': 'i686-{}-{}',
+            'amd64': 'x86_64-{}-{}',
+            'ppc64el': 'powerpc64le-{}-{}',
+        }
+        fmt = targets.get(self.project.deb_arch)
+        if not fmt:
+            raise NotImplementedError(
+                '{!r} is not supported as a target architecture when '
+                'cross-compiling with the rust plugin'.format(
+                    self.project.deb_arch))
+        self._target = fmt.format('unknown-linux', 'gnu')
 
     def _build_env(self):
         env = os.environ.copy()
         env.update({"RUSTC": self._rustc,
                     "RUSTDOC": self._rustdoc,
-                    "RUST_PATH": self._rustlib})
+                    "RUST_PATH": self._rustlib,
+                    'RUSTFLAGS': self._rustflags()})
         return env
+
+    def _rustflags(self):
+        ldflags = shell_utils.getenv('LDFLAGS')
+        rustldflags = ''
+        flags = {flag for flag in ldflags.split(' ') if flag}
+        for flag in flags:
+            rustldflags += '-C link-arg={} '.format(flag)
+        return rustldflags.strip()
 
     def pull(self):
         super().pull()
@@ -116,9 +183,14 @@ class RustPlugin(snapcraft.BasePlugin):
     def clean_pull(self):
         super().clean_pull()
 
-        # Remove the rust path (if any)
-        if os.path.exists(self._rustpath):
+        with suppress(FileNotFoundError):
             shutil.rmtree(self._rustpath)
+
+    def clean_build(self):
+        super().clean_build()
+
+        with suppress(FileNotFoundError):
+            shutil.rmtree(self._cargo_dir)
 
     def _fetch_rust(self):
         options = []
@@ -131,17 +203,25 @@ class RustPlugin(snapcraft.BasePlugin):
                 options.append(
                     '--channel={}'.format(self.options.rust_channel))
             else:
-                raise EnvironmentError(
+                raise errors.SnapcraftEnvironmentError(
                     '{} is not a valid rust channel'.format(
                         self.options.rust_channel))
-        if not os.path.exists(self._rustpath):
-            os.makedirs(self._rustpath)
+        os.makedirs(self._rustpath, exist_ok=True)
         self._rustup_get.download()
-        self.run([self._rustup,
-                  '--prefix={}'.format(self._rustpath),
-                  '--disable-sudo', '--save'] + options)
+        cmd = [self._rustup,
+               '--prefix={}'.format(self._rustpath),
+               '--disable-sudo', '--save'] + options
+        if self.project.is_cross_compiling:
+            cmd.append('--with-target={}'.format(self._target))
+        self.run(cmd)
 
     def _fetch_deps(self):
+        if self.options.source_subdir:
+            sourcedir = os.path.join(self.sourcedir,
+                                     self.options.source_subdir)
+        else:
+            sourcedir = self.sourcedir
+
         self.run([self._cargo, 'fetch',
                   '--manifest-path',
-                  os.path.join(self.sourcedir, 'Cargo.toml')])
+                  os.path.join(sourcedir, 'Cargo.toml')])

@@ -16,10 +16,12 @@
 
 import os
 import subprocess
+from textwrap import dedent
 
 import fixtures
 import testtools
 from testtools.matchers import (
+    Equals,
     EndsWith,
     FileContains,
     FileExists,
@@ -62,7 +64,7 @@ class SnapTestCase(integration_tests.TestCase):
         for binary, expected_output in binary_scenarios:
             output = subprocess.check_output(
                 os.path.join(self.prime_dir, binary), universal_newlines=True)
-            self.assertEqual(expected_output, output)
+            self.assertThat(output, Equals(expected_output))
 
         with testtools.ExpectedException(subprocess.CalledProcessError):
             subprocess.check_output(
@@ -71,6 +73,11 @@ class SnapTestCase(integration_tests.TestCase):
 
         self.assertThat(
             os.path.join(self.prime_dir, 'bin', 'not-wrapped.wrapper'),
+            Not(FileExists()))
+
+        self.assertThat(
+            os.path.join(self.prime_dir, 'bin',
+                         'command-binary-wrapper-none.wrapper.wrapper'),
             Not(FileExists()))
 
     def test_snap_default(self):
@@ -103,6 +110,19 @@ class SnapTestCase(integration_tests.TestCase):
         self.run_snapcraft(['snap', 'prime'])
         self.assertThat(snap_file_path, FileExists())
 
+    def test_pack_directory(self):
+        self.copy_project_to_cwd('assemble')
+        self.run_snapcraft('snap')
+
+        snap_file_path = 'assemble_1.0_{}.snap'.format(self.deb_arch)
+        os.remove(snap_file_path)
+
+        # Verify that Snapcraft can snap its own snap directory (this will make
+        # sure `snapcraft snap` and `snapcraft pack <directory>` are always
+        # in sync).
+        self.run_snapcraft(['pack', 'prime'])
+        self.assertThat(snap_file_path, FileExists())
+
     def test_snap_long_output_option(self):
         self.run_snapcraft(['snap', '--output', 'mysnap.snap'], 'assemble')
         self.assertThat('mysnap.snap', FileExists())
@@ -124,7 +144,7 @@ class SnapTestCase(integration_tests.TestCase):
             subprocess.CalledProcessError, self.run_snapcraft, 'snap')
         expected = (
             "Could not find a required package in 'build-packages': "
-            '"The cache has no package named \'inexistent-package\'"\n')
+            "inexistent-package\n")
         self.assertThat(exception.output, EndsWith(expected))
 
     def test_snap_with_exposed_files(self):
@@ -149,6 +169,24 @@ class SnapTestCase(integration_tests.TestCase):
 
         self.run_snapcraft('snap')
 
+    def test_snap_with_arch(self):
+        self.run_snapcraft('init')
+
+        self.run_snapcraft(['snap', '--target-arch=i386'])
+        self.assertThat('my-snap-name_0.1_i386.snap', FileExists())
+
+    def test_arch_with_snap(self):
+        self.run_snapcraft('init')
+
+        self.run_snapcraft(['--target-arch=i386', 'snap'])
+        self.assertThat('my-snap-name_0.1_i386.snap', FileExists())
+
+    def test_implicit_command_with_arch(self):
+        self.run_snapcraft('init')
+
+        self.run_snapcraft('--target-arch=i386')
+        self.assertThat('my-snap-name_0.1_i386.snap', FileExists())
+
     def test_error_on_bad_yaml(self):
         error = self.assertRaises(
             subprocess.CalledProcessError,
@@ -157,3 +195,55 @@ class SnapTestCase(integration_tests.TestCase):
             "Issues while validating snapcraft.yaml: found character '\\t' "
             "that cannot start any token on line 13 of snapcraft.yaml",
             str(error.output))
+
+    def test_yaml_merge_tag(self):
+        self.copy_project_to_cwd('yaml-merge-tag')
+        self.run_snapcraft('stage')
+        self.assertThat(
+            os.path.join(self.stage_dir, 'test.txt'),
+            FileExists()
+        )
+
+    def test_ordered_snap_yaml(self):
+        with open('snapcraft.yaml', 'w') as s:
+            s.write(dedent("""\
+                apps:
+                    stub-app:
+                        command: sh
+                grade: stable
+                version: "2"
+                assumes: [snapd_227]
+                architectures: [all]
+                description: stub description
+                summary: stub summary
+                confinement: strict
+                name: stub-snap
+                environment:
+                    stub_key: stub-value
+                epoch: 1
+                parts:
+                    nothing:
+                        plugin: nil
+            """))
+        self.run_snapcraft('prime')
+
+        expected_snap_yaml = dedent("""\
+            name: stub-snap
+            version: '2'
+            summary: stub summary
+            description: stub description
+            architectures:
+            - all
+            confinement: strict
+            grade: stable
+            assumes:
+            - snapd_227
+            epoch: 1
+            environment:
+              stub_key: stub-value
+            apps:
+              stub-app:
+                command: command-stub-app.wrapper
+        """)
+        self.assertThat(os.path.join('prime', 'meta', 'snap.yaml'),
+                        FileContains(expected_snap_yaml))

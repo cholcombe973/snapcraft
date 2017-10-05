@@ -18,7 +18,6 @@ import re
 import glob
 import logging
 import os
-import platform
 import subprocess
 
 from snapcraft.internal import common
@@ -67,11 +66,11 @@ def _get_system_libs():
     if _libraries:
         return _libraries
 
-    release = platform.linux_distribution()[1]
+    release = common.get_os_release_info()['VERSION_ID']
     lib_path = os.path.join(common.get_librariesdir(), release)
 
     if not os.path.exists(lib_path):
-        logger.warning('No libraries to exclude from this release')
+        logger.debug('No libraries to exclude from this release')
         # Always exclude libc.so.6
         return frozenset(['libc.so.6'])
 
@@ -86,7 +85,7 @@ def get_dependencies(elf):
 
     This may include libraries contained within the project.
     """
-    logger.debug('Getting dependencies for {!r}'.format(elf))
+    logger.debug('Getting dependencies for {!r}'.format(str(elf)))
     ldd_out = ''
     try:
         ldd_out = common.run_output(['ldd', elf]).split('\n')
@@ -100,5 +99,8 @@ def get_dependencies(elf):
     # Now lets filter out what would be on the system
     system_libs = _get_system_libs()
     libs = [l for l in ldd_out if not os.path.basename(l) in system_libs]
+    # Classic confinement won't do what you want with library crawling
+    # and has a nasty side effect described in LP: #1670100
+    libs = [l for l in libs if not l.startswith('/snap/')]
 
     return libs

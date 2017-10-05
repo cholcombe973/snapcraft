@@ -1,6 +1,6 @@
 # -*- Mode:Python; indent-tabs-mode:nil; tab-width:4 -*-
 #
-# Copyright (C) 2015-2016 Canonical Ltd
+# Copyright (C) 2015-2017 Canonical Ltd
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
@@ -24,9 +24,10 @@ from ._base import Base
 class Subversion(Base):
 
     def __init__(self, source, source_dir, source_tag=None, source_commit=None,
-                 source_branch=None, source_depth=None):
+                 source_branch=None, source_depth=None, source_checksum=None,
+                 silent=False):
         super().__init__(source, source_dir, source_tag, source_commit,
-                         source_branch, source_depth, 'svn')
+                         source_branch, source_depth, source_checksum, 'svn')
         if source_tag:
             if source_branch:
                 raise errors.IncompatibleOptionsError(
@@ -41,6 +42,14 @@ class Subversion(Base):
         if source_depth:
             raise errors.IncompatibleOptionsError(
                 'can\'t specify source-depth for a Subversion source')
+        if source_checksum:
+            raise errors.IncompatibleOptionsError(
+                "can't specify a source-checksum for a Subversion source")
+
+        self._call_kwargs = {}
+        if silent:
+            self._call_kwargs['stdout'] = subprocess.DEVNULL
+            self._call_kwargs['stderr'] = subprocess.DEVNULL
 
     def pull(self):
         opts = []
@@ -50,14 +59,39 @@ class Subversion(Base):
 
         if os.path.exists(os.path.join(self.source_dir, '.svn')):
             subprocess.check_call(
-                [self.command, 'update'] + opts, cwd=self.source_dir)
+                [self.command, 'update'] + opts, cwd=self.source_dir,
+                **self._call_kwargs)
         else:
             if os.path.isdir(self.source):
                 subprocess.check_call(
                     [self.command, 'checkout',
                      'file://{}'.format(os.path.abspath(self.source)),
-                     self.source_dir] + opts)
+                     self.source_dir] + opts, **self._call_kwargs)
             else:
                 subprocess.check_call(
                     [self.command, 'checkout', self.source, self.source_dir] +
-                    opts)
+                    opts, **self._call_kwargs)
+
+        self.source_details = self._get_source_details()
+
+    def _get_source_details(self):
+        branch = None
+        tag = None
+        source = self.source
+        commit = self.source_commit
+
+        if not commit:  # retrieve the commit id
+            lines = subprocess.check_output(['svn', 'info', self.source_dir]
+                                            ).decode('utf-8').split('\n')
+            prefix = 'Last Changed Rev: '
+            for line in lines:
+                if line.startswith(prefix):
+                    commit = line.replace(prefix, '')
+                    break
+
+        return {
+            'source-commit': commit,
+            'source-branch': branch,
+            'source': source,
+            'source-tag': tag,
+        }

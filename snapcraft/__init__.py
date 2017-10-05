@@ -1,6 +1,6 @@
 # -*- Mode:Python; indent-tabs-mode:nil; tab-width:4 -*-
 #
-# Copyright (C) 2015 Canonical Ltd
+# Copyright (C) 2015-2017 Canonical Ltd
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
@@ -30,7 +30,7 @@ These plugins implement a lifecycle over the following steps:
 
   - pull:   retrieve the source for the part from the specified location
   - build:  drive the build system determined by the choice of plugin
-  - stage:  consolidate desireable files from all the parts in one tree
+  - stage:  consolidate desirable files from all the parts in one tree
   - prime:  distill down to only the files which will go into the snap
   - snap:   compress the prime tree into the installable snap file
 
@@ -136,20 +136,97 @@ of the choice of plugin.
     parts is available to every snap author - just say 'after' and list the
     parts you want that others have already defined.
 
-  - build-packages: [deb, deb, deb...]
+  - build-packages: [pkg, pkg, pkg...]
 
-    A list of Ubuntu packages to install on the build host before building
+    A list of packages to install on the build host before building
     the part. The files from these packages typically will not go into the
     final snap unless they contain libraries that are direct dependencies of
     binaries within the snap (in which case they'll be discovered via `ldd`),
     or they are explicitly described in stage-packages.
 
-  - stage-packages: [deb, deb, deb...]
+  - stage-packages: YAML list
 
-    A list of Ubuntu packages to be downloaded and unpacked to join the part
+    A set of packages to be downloaded and unpacked to join the part
     before it's built. Note that these packages are not installed on the host.
     Like the rest of the part, all files from these packages will make it into
     the final snap unless filtered out via the `snap` keyword.
+
+    One may simply specify packages in a flat list, in which case the packages
+    will be fetched and unpacked regardless of build environment. In addition,
+    a specific grammar made up of sub-lists is supported here that allows one
+    to filter stage packages depending on various selectors (e.g. the target
+    arch), as well as specify optional packages. The grammar is made up of two
+    nestable statements: 'on' and 'try'.
+
+    Let's discuss `on`.
+
+        - on <selector>[,<selector>...]:
+          - ...
+        - else[ fail]:
+          - ...
+
+    The body of the 'on' clause is taken into account if every (AND, not OR)
+    selector is true for the target build environment. Currently the only
+    selectors supported are target architectures (e.g. amd64).
+
+    If the 'on' clause doesn't match and it's immediately followed by an 'else'
+    clause, the 'else' clause must be satisfied. An 'on' clause without an
+    'else' clause is considered satisfied even if no selector matched. The
+    'else fail' form allows erroring out if an 'on' clause was not matched.
+
+    For example, say you only wanted to stage `foo` if building for amd64 (and
+    not stage `foo` if otherwise):
+
+        - on amd64: [foo]
+
+    Building on that, say you wanted to stage `bar` if building on an arch
+    other than amd64:
+
+        - on amd64: [foo]
+        - else: [bar]
+
+    You can nest these for more complex behaviors:
+
+        - on amd64: [foo]
+        - else:
+          - on i386: [bar]
+          - on armhf: [baz]
+
+    If your project requires a package that is only available on amd64, you can
+    fail if you're not building for amd64:
+
+        - on amd64: [foo]
+        - else fail
+
+    Now let's discuss `try`:
+
+        - try:
+          - ...
+        - else:
+          - ...
+
+    The body of the 'try' clause is taken into account only when all packages
+    contained within it are valid. If not, if it's immediately followed by
+    'else' clauses they are tried in order, and one of them must be satisfied.
+    A 'try' clause with no 'else' clause is considered satisfied even if it
+    contains invalid packages.
+
+    For example, say you wanted to stage `foo`, but it wasn't available for all
+    architectures. Assuming your project builds without it, you can make it an
+    optional stage package:
+
+        - try: [foo]
+
+    You can also add alternatives:
+
+        - try: [foo]
+        - else: [bar]
+
+    Again, you can nest these for more complex behaviors:
+
+        - on amd64: [foo]
+        - else:
+          - try: [bar]
 
   - organize: YAML
 
@@ -273,25 +350,69 @@ of the choice of plugin.
         the dependencies of this part. This might be useful if one knows these
         dependencies will be satisfied in other manner, e.g. via content
         sharing from other snaps.
+
+      - no-install:
+        Do not run the install target provided by the plugin's build system.
+
+        Supported by: kbuild
+
+      - debug:
+        Plugins that support the concept of build types build in Release mode
+        by default. Setting the 'debug' attribute requests that they instead
+        build in Debug mode.
 """
 
 from collections import OrderedDict                 # noqa
 import pkg_resources                                # noqa
 import yaml                                         # noqa
 
+import os as _os
+if _os.environ.get('SNAP_NAME') == 'snapcraft':
+    # The current implementation as of 3.6 in for find_library in
+    # ctypes.util makes use of `ldconfig -p` which depends on the
+    # current ld cache which in effect has no knowledge of any library
+    # in $SNAP. What makes matters worse is that it will provide
+    # results for on host libraries we do NOT want.
+    import re as _re
+
+    def find_library(name):
+        regex = r'lib{name}\.[^\s]+'.format(name=_re.escape(name))
+        snap_root = _os.environ.get('SNAP')
+        for root, directories, files in _os.walk(snap_root):
+            for filename in files:
+                res = _re.search(regex, filename)
+                if res:
+                    return res.group(0)
+
+    import ctypes.util
+    ctypes.util.find_library = find_library
+
+
+def _get_version():
+    if _os.environ.get('SNAP_NAME') == 'snapcraft':
+        return _os.environ['SNAP_VERSION']
+    try:
+        return pkg_resources.require('snapcraft')[0].version
+    except pkg_resources.DistributionNotFound:
+        return 'devel'
+
+
+# Set this early so that the circular imports aren't too painful
+__version__ = _get_version()
+
+
 from snapcraft._baseplugin import BasePlugin        # noqa
 from snapcraft._options import ProjectOptions       # noqa
-from snapcraft._help import topic_help              # noqa
+# FIXME LP: #1662658
 from snapcraft._store import (                      # noqa
     create_key,
     close,
     download,
-    history,
+    revisions,
     gated,
     list_keys,
     list_registered,
     login,
-    logout,
     push,
     register,
     register_key,
@@ -299,6 +420,7 @@ from snapcraft._store import (                      # noqa
     sign_build,
     status,
     validate,
+    collaborate,
 )
 from snapcraft import common                        # noqa
 from snapcraft import plugins                       # noqa
@@ -306,16 +428,6 @@ from snapcraft import sources                       # noqa
 from snapcraft import file_utils                    # noqa
 from snapcraft import shell_utils                   # noqa
 from snapcraft.internal import repo                 # noqa
-
-
-def _get_version():
-    try:
-        return pkg_resources.require('snapcraft')[0].version
-    except pkg_resources.DistributionNotFound:
-        return 'devel'
-
-
-__version__ = _get_version()
 
 
 # Setup yaml module globally
@@ -329,6 +441,8 @@ def dict_representer(dumper, data):
 
 
 def dict_constructor(loader, node):
+    # Necessary in order to make yaml merge tags work
+    loader.flatten_mapping(node)
     return OrderedDict(loader.construct_pairs(node))
 
 

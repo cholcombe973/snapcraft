@@ -1,6 +1,6 @@
 # -*- Mode:Python; indent-tabs-mode:nil; tab-width:4 -*-
 #
-# Copyright (C) 2016 Canonical Ltd
+# Copyright (C) 2016-2017 Canonical Ltd
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
@@ -29,6 +29,7 @@ For more information check the 'plugins' topic for the former and the
 'sources' topic for the latter.
 """
 
+import os
 import re
 
 import snapcraft
@@ -43,14 +44,31 @@ class PlainboxProviderPlugin(snapcraft.BasePlugin):
 
     def build(self):
         super().build()
-        self.run(["python3", "manage.py", "build"])
-        self.run(["python3", "manage.py", "i18n"])
+
+        env = os.environ.copy()
+        provider_stage_dir = os.path.join(self.project.stage_dir, 'providers')
+        if os.path.exists(provider_stage_dir):
+            provider_dirs = [os.path.join(provider_stage_dir, provider)
+                             for provider in os.listdir(provider_stage_dir)]
+            env['PROVIDERPATH'] = ':'.join(provider_dirs)
+        self.run(['python3', 'manage.py', 'validate'], env=env)
+        self.run(['python3', 'manage.py', 'build'])
+        self.run(['python3', 'manage.py', 'i18n'])
         self.run([
-            "python3", "manage.py", "install", "--layout=relocatable",
-            "--prefix=/providers/{}".format(self.name),
-            "--root={}".format(self.installdir)])
+            'python3', 'manage.py', 'install', '--layout=relocatable',
+            '--prefix=/providers/{}'.format(self.name),
+            '--root={}'.format(self.installdir)])
 
         # Fix all shebangs to use the in-snap python.
         file_utils.replace_in_file(self.installdir, re.compile(r''),
                                    re.compile(r'^#!.*python'),
                                    r'#!/usr/bin/env python')
+
+    def snap_fileset(self):
+        fileset = super().snap_fileset()
+        # If a python package is added as a stage-packages it will include
+        # sitecustomize.py which is irrelevant and will cause unnecessary
+        # conflicts so instead we just ignore these entries.
+        fileset.append('-usr/lib/python*/sitecustomize.py')
+        fileset.append('-etc/python*/sitecustomize.py')
+        return fileset

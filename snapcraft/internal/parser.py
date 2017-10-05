@@ -51,21 +51,9 @@ from docopt import docopt
 from collections import OrderedDict
 
 import snapcraft
-from snapcraft.internal import log, repo, sources
-from snapcraft.internal.errors import SnapcraftError, InvalidWikiEntryError
-from snapcraft.internal.project_loader import replace_attr
-
-
-class BadSnapcraftYAMLError(Exception):
-    pass
-
-
-class MissingSnapcraftYAMLError(Exception):
-    pass
-
+from snapcraft.internal import errors, log, project_loader, repo, sources
 
 logger = logging.getLogger(__name__)
-
 
 # TODO: make this a temporary directory that get's removed when finished
 BASE_DIR = os.path.join(BaseDirectory.xdg_cache_home, 'snapcraft-parser')
@@ -96,28 +84,13 @@ def main(argv=None):
 
 def _get_origin_data(origin_dir):
     origin_data = {}
-    snapcraft_yaml_file = os.path.join(origin_dir, 'snapcraft.yaml')
-    hidden_snapcraft_yaml_file = os.path.join(origin_dir, '.snapcraft.yaml')
 
-    # read either 'snapcraft.yaml' or '.snapcraft.yaml' but not both
-    if not os.path.exists(snapcraft_yaml_file) and not os.path.exists(
-            hidden_snapcraft_yaml_file):
-        raise MissingSnapcraftYAMLError()
-
-    if os.path.exists(snapcraft_yaml_file):
-        if os.path.exists(hidden_snapcraft_yaml_file):
-            raise BadSnapcraftYAMLError(
-                'Origin has both "snapcraft.yaml" and ".snapcraft.yaml"')
-        else:
-            yaml_file = snapcraft_yaml_file
-    elif os.path.exists(hidden_snapcraft_yaml_file):
-        yaml_file = hidden_snapcraft_yaml_file
-
+    yaml_file = project_loader.get_snapcraft_yaml(base_dir=origin_dir)
     try:
         with open(yaml_file) as fp:
             origin_data = yaml.load(fp)
     except ScannerError as e:
-        raise InvalidWikiEntryError(e)
+        raise errors.InvalidWikiEntryError(e) from e
 
     return origin_data
 
@@ -155,7 +128,7 @@ def _process_entry_parts(entry_parts, parts, origin, maintainer, description,
             ('$SNAPCRAFT_PROJECT_VERSION', origin_version),
         ]
 
-        source_part = replace_attr(source_part, replacements)
+        source_part = project_loader.replace_attr(source_part, replacements)
 
         if source_part:
             source_part = _update_source(source_part, origin)
@@ -198,7 +171,8 @@ def _process_entry(data):
         maintainer = data['maintainer']
         description = data['description']
     except KeyError as e:
-        raise InvalidWikiEntryError('Missing key in wiki entry: {}'.format(e))
+        raise errors.InvalidWikiEntryError(
+            'Missing key in wiki entry: {}'.format(e))
 
     logger.info('Processing origin {origin!r}'.format(origin=origin))
     origin_dir = os.path.join(_get_base_dir(), _encode_origin(origin))
@@ -215,12 +189,13 @@ def _process_entry(data):
 
     try:
         origin_data = _get_origin_data(origin_dir)
-    except MissingSnapcraftYAMLError:
-        raise InvalidWikiEntryError(
+    except project_loader.errors.MissingSnapcraftYamlError as e:
+        raise errors.InvalidWikiEntryError(
             'Origin {origin!r} is missing a snapcraft.yaml file.'.format(
-                origin=origin))
-    except BadSnapcraftYAMLError as e:
-        raise InvalidWikiEntryError('snapcraft.yaml error: {}'.format(e))
+                origin=origin)) from e
+    except errors.SnapcraftEnvironmentError as e:
+        raise errors.InvalidWikiEntryError(
+            'snapcraft.yaml error: {}'.format(e)) from e
 
     origin_parts = origin_data.get('parts', {})
     origin_name = origin_data.get('name')
@@ -244,17 +219,17 @@ def _process_wiki_entry(
     try:
         data = yaml.load(entry)
     except (ScannerError, ParserError) as e:
-        raise InvalidWikiEntryError(
+        raise errors.InvalidWikiEntryError(
             'Bad wiki entry, possibly malformed YAML for entry: {}'.format(e))
 
     try:
         parts = data['parts']
     except KeyError as e:
-        raise InvalidWikiEntryError(
+        raise errors.InvalidWikiEntryError(
             '"parts" missing from wiki entry: {}'.format(entry))
     for part_name in parts:
         if part_name and part_name in master_parts_list:
-            raise InvalidWikiEntryError(
+            raise errors.InvalidWikiEntryError(
                 'Duplicate part found in the wiki: {} in entry {}'.format(
                     part_name, entry))
 
@@ -282,7 +257,7 @@ def _try_process_entry(
         _process_wiki_entry(
             entry, master_parts_list, missing_parts,
             pending_validation_entries)
-    except SnapcraftError as e:
+    except errors.SnapcraftError as e:
         logger.warning(e)
         wiki_errors += 1
 

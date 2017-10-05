@@ -1,6 +1,6 @@
 # -*- Mode:Python; indent-tabs-mode:nil; tab-width:4 -*-
 #
-# Copyright (C) 2015-2016 Canonical Ltd
+# Copyright (C) 2015-2017 Canonical Ltd
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
@@ -13,13 +13,13 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from testtools.matchers import Equals, Contains
 
-from snapcraft.main import main
-from snapcraft import tests
 from snapcraft.tests import fixture_setup
+from . import CommandBaseTestCase
 
 
-class ListPluginsCommandTestCase(tests.TestCase):
+class ListPluginsCommandTestCase(CommandBaseTestCase):
 
     scenarios = [
         ('list-plugins', {'command_name': 'list-plugins'}),
@@ -28,12 +28,12 @@ class ListPluginsCommandTestCase(tests.TestCase):
 
     # plugin list when wrapper at MAX_CHARACTERS_WRAP
     default_plugin_output = (
-        'ant        cmake  go      gulp    kernel  nil                '
-        'python   qbs    scons      \n'
-        'autotools  copy   godeps  jdk     make    nodejs             '
-        'python2  qmake  tar-content\n'
-        'catkin     dump   gradle  kbuild  maven   plainbox-provider  '
-        'python3  rust   waf        \n'
+        'ant        cmake  go      gulp     kbuild  maven  '
+        'nodejs             python2  ruby   tar-content\n'
+        'autotools  copy   godeps  jdk      kernel  meson  '
+        'plainbox-provider  python3  rust   waf        \n'
+        'catkin     dump   gradle  jhbuild  make    nil    '
+        'python             qmake    scons\n'
     )
 
     def test_list_plugins_non_tty(self):
@@ -41,16 +41,20 @@ class ListPluginsCommandTestCase(tests.TestCase):
         fake_terminal = fixture_setup.FakeTerminal(isatty=False)
         self.useFixture(fake_terminal)
 
-        main([self.command_name])
-        self.assertEqual(fake_terminal.getvalue(), self.default_plugin_output)
+        result = self.run_command([self.command_name])
+
+        self.assertThat(result.exit_code, Equals(0))
+        self.assertThat(result.output, Contains(self.default_plugin_output))
 
     def test_list_plugins_large_terminal(self):
         self.maxDiff = None
         fake_terminal = fixture_setup.FakeTerminal(columns=999)
         self.useFixture(fake_terminal)
 
-        main([self.command_name])
-        self.assertEqual(fake_terminal.getvalue(), self.default_plugin_output)
+        result = self.run_command([self.command_name])
+
+        self.assertThat(result.exit_code, Equals(0))
+        self.assertThat(result.output, Contains(self.default_plugin_output))
 
     def test_list_plugins_small_terminal(self):
         self.maxDiff = None
@@ -58,13 +62,15 @@ class ListPluginsCommandTestCase(tests.TestCase):
         self.useFixture(fake_terminal)
 
         expected_output = (
-            'ant        go      kernel             python   scons      \n'
-            'autotools  godeps  make               python2  tar-content\n'
-            'catkin     gradle  maven              python3  waf        \n'
-            'cmake      gulp    nil                qbs    \n'
-            'copy       jdk     nodejs             qmake  \n'
-            'dump       kbuild  plainbox-provider  rust   \n'
+            'ant        go       kbuild  nodejs             ruby       \n'
+            'autotools  godeps   kernel  plainbox-provider  rust       \n'
+            'catkin     gradle   make    python             scons      \n'
+            'cmake      gulp     maven   python2            tar-content\n'
+            'copy       jdk      meson   python3            waf        \n'
+            'dump       jhbuild  nil     qmake            \n'
         )
 
-        main([self.command_name])
-        self.assertEqual(fake_terminal.getvalue(), expected_output)
+        result = self.run_command([self.command_name])
+
+        self.assertThat(result.exit_code, Equals(0))
+        self.assertThat(result.output, Contains(expected_output))

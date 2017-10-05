@@ -19,17 +19,18 @@ import jsonschema
 
 from unittest.mock import Mock, patch
 import testtools
-from testtools.matchers import HasLength
+from testtools.matchers import Equals, HasLength
 
 import snapcraft
 from snapcraft.plugins.copy import (
     CopyPlugin,
     _recursively_link
 )
-from snapcraft.tests import TestCase
+from snapcraft.internal import errors
+from snapcraft import tests
 
 
-class TestCopyPlugin(TestCase):
+class TestCopyPlugin(tests.TestCase):
 
     def setUp(self):
         super().setUp()
@@ -63,12 +64,12 @@ class TestCopyPlugin(TestCase):
         c = CopyPlugin('copy', self.mock_options, self.project_options)
         c.pull()
 
-        raised = self.assertRaises(EnvironmentError, c.build)
+        raised = self.assertRaises(FileNotFoundError, c.build)
 
-        self.assertEqual(
+        self.assertThat(
             str(raised),
-            "[Errno 2] No such file or directory: '{}/src'".format(
-                c.builddir))
+            Equals("[Errno 2] No such file or directory: '{}/src'".format(
+                c.builddir)))
 
     def test_copy_glob_does_not_match_anything(self):
         # ensure that a bad file causes a warning and fails the build even
@@ -79,9 +80,9 @@ class TestCopyPlugin(TestCase):
         c = CopyPlugin('copy', self.mock_options, self.project_options)
         c.pull()
 
-        raised = self.assertRaises(EnvironmentError, c.build)
+        raised = self.assertRaises(errors.SnapcraftEnvironmentError, c.build)
 
-        self.assertEqual(raised.__str__(), "no matches for 'src*'")
+        self.assertThat(raised.__str__(), Equals("no matches for 'src*'"))
 
     def test_copy_plugin_copies(self):
         self.mock_options.files = {
@@ -253,13 +254,12 @@ class TestCopyPlugin(TestCase):
         for symlink in symlinks:
             os.symlink(symlink['source'], symlink['link_name'])
 
-        c.pull()
         c.build()
 
         self.assertTrue(os.path.isdir(destination),
                         "Expected foo's contents to be copied into baz/")
         with open(os.path.join(destination, 'file'), 'r') as f:
-            self.assertEqual(f.read(), 'foo')
+            self.assertThat(f.read(), Equals('foo'))
 
         for symlink in symlinks:
             destination = symlink['destination']
@@ -267,14 +267,14 @@ class TestCopyPlugin(TestCase):
                 os.path.islink(destination),
                 'Expected {!r} to be a symlink'.format(destination))
 
-            self.assertEqual(
+            self.assertThat(
                 os.path.realpath(destination),
-                symlink['expected_realpath'],
+                Equals(symlink['expected_realpath']),
                 'Expected {!r} to be a relative path to {!r}'.format(
                     destination, symlink['expected_realpath']))
 
             with open(destination, 'r') as f:
-                self.assertEqual(f.read(), symlink['expected_contents'])
+                self.assertThat(f.read(), Equals(symlink['expected_contents']))
 
     def test_copy_symlinks_that_should_be_followed(self):
         self.mock_options.files = {'foo/*': '.'}
@@ -315,7 +315,7 @@ class TestCopyPlugin(TestCase):
         c.build()
 
         with open(os.path.join(c.installdir, 'file'), 'r') as f:
-            self.assertEqual(f.read(), 'foo')
+            self.assertThat(f.read(), Equals('foo'))
 
         for symlink in symlinks:
             destination = symlink['destination']
@@ -324,7 +324,29 @@ class TestCopyPlugin(TestCase):
                              'symlink'.format(destination))
 
             with open(destination, 'r') as f:
-                self.assertEqual(f.read(), symlink['expected_contents'])
+                self.assertThat(f.read(), Equals(symlink['expected_contents']))
+
+    def test_copy_symlinks_to_libc(self):
+        self.mock_options.files = {'*': '.'}
+
+        c = CopyPlugin('copy', self.mock_options, self.project_options)
+
+        # These directories are created by the pluginhandler
+        os.makedirs(c.builddir)
+
+        # Even though this symlink is absolute, since it's to libc the copy
+        # plugin shouldn't try to follow it or modify it.
+        libc_libs = snapcraft.repo.Repo.get_package_libraries('libc6')
+
+        # We don't care which lib we're testing with, as long as it's a .so.
+        libc_library_path = [lib for lib in libc_libs if '.so' in lib][0]
+        os.symlink(libc_library_path, os.path.join(c.builddir, 'libc-link'))
+
+        c.build()
+
+        self.assertThat(
+            os.path.join(c.installdir, 'libc-link'),
+            tests.LinkExists(libc_library_path))
 
     def test_copy_enable_cross_compilation(self):
         c = CopyPlugin('copy', self.mock_options, self.project_options)
@@ -342,7 +364,7 @@ class TestCopyPlugin(TestCase):
             jsonschema.validate({'files': {'foo': ''}}, CopyPlugin.schema())
 
 
-class TestRecursivelyLink(TestCase):
+class TestRecursivelyLink(tests.TestCase):
 
     def setUp(self):
         super().setUp()
@@ -392,9 +414,10 @@ class TestRecursivelyLink(TestCase):
             NotADirectoryError,
             _recursively_link, 'foo', 'qux', os.getcwd())
 
-        self.assertEqual(
+        self.assertThat(
             str(raised),
-            "Cannot overwrite non-directory 'qux' with directory 'foo'")
+            Equals(
+                "Cannot overwrite non-directory 'qux' with directory 'foo'"))
 
     def test_recursively_link_subtree(self):
         _recursively_link('foo/bar', 'qux', os.getcwd())

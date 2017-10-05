@@ -1,6 +1,6 @@
 # -*- Mode:Python; indent-tabs-mode:nil; tab-width:4 -*-
 #
-# Copyright (C) 2015-2016 Canonical Ltd
+# Copyright (C) 2015-2017 Canonical Ltd
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
@@ -14,15 +14,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import collections
 import os
 import tempfile
 from glob import glob
 from unittest import mock
 
-from testtools.matchers import FileContains, HasLength
+import fixtures
+from testtools.matchers import Equals, FileContains, HasLength
 
 import snapcraft
 from snapcraft import tests
+from snapcraft.tests import fixture_setup
 from snapcraft.plugins import python
 
 
@@ -51,7 +54,14 @@ def setup_directories(plugin, python_version):
                 '# comment\n')
 
 
-class PythonPluginTestCase(tests.TestCase):
+def fake_empty_pip_list(*args, **kwargs):
+    if 'list' in args[0]:
+        return '{}'
+    else:
+        return ''
+
+
+class BasePythonPluginTestCase(tests.TestCase):
 
     def setUp(self):
         super().setUp()
@@ -74,6 +84,9 @@ class PythonPluginTestCase(tests.TestCase):
         patcher = mock.patch('subprocess.check_output')
         self.mock_call_output = patcher.start()
         self.addCleanup(patcher.stop)
+
+
+class PythonPluginTestCase(BasePythonPluginTestCase):
 
     def test_schema(self):
         schema = python.PythonPlugin.schema()
@@ -119,17 +132,22 @@ class PythonPluginTestCase(tests.TestCase):
         env_missing_path = plugin.env('/testpath')
         self.assertTrue('PYTHONPATH=/testpath' not in env_missing_path)
 
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
     @mock.patch.object(python.PythonPlugin, 'run')
     @mock.patch.object(os.path, 'exists', return_value=False)
-    def test_missing_setup_path(self, mock_path_exists, mock_run):
+    def test_missing_setup_path(
+            self, mock_path_exists, mock_run, mock_run_output):
         plugin = python.PythonPlugin('test-part', self.options,
                                      self.project_options)
         setup_directories(plugin, self.options.python_version)
         plugin.pull()
         self.assertFalse(mock_run.called)
 
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
     @mock.patch.object(python.PythonPlugin, 'run')
-    def test_pull_with_nothing(self, mock_run):
+    def test_pull_with_nothing(self, mock_run, mock_run_output):
         plugin = python.PythonPlugin('test-part', self.options,
                                      self.project_options)
         setup_directories(plugin, self.options.python_version)
@@ -137,8 +155,10 @@ class PythonPluginTestCase(tests.TestCase):
         plugin.pull()
         mock_run.assert_has_calls([])
 
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
     @mock.patch.object(python.PythonPlugin, 'run')
-    def test_pull_with_requirements(self, mock_run):
+    def test_pull_with_requirements(self, mock_run, mock_run_output):
         self.options.requirements = 'requirements.txt'
         self.options.constraints = 'constraints.txt'
         self.options.python_packages = ['test', 'packages']
@@ -168,8 +188,10 @@ class PythonPluginTestCase(tests.TestCase):
         plugin.pull()
         mock_run.assert_has_calls(calls)
 
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
     @mock.patch.object(python.PythonPlugin, 'run')
-    def test_pull_without_requirements(self, mock_run):
+    def test_pull_without_requirements(self, mock_run, mock_run_output):
         self.options.requirements = ''
         self.options.constraints = 'constraints.txt'
         self.options.python_packages = ['test', 'packages']
@@ -227,15 +249,24 @@ class PythonPluginTestCase(tests.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-        mock_run_output.return_value = 'yaml (1.2)\bextras (1.0)'
+        mock_run_output.return_value = (
+            '[{"name": "yaml", "version": "1.2"},'
+            ' {"name": "extras", "version": "1.0"}]')
 
-        os.environ = {}
+        self.useFixture(fixture_setup.CleanEnvironment())
         plugin = python.PythonPlugin('test-part', self.options,
                                      self.project_options)
         setup_directories(plugin, self.options.python_version)
 
+        for file_name in (self.options.requirements, self.options.constraints):
+            path = os.path.join(plugin.sourcedir, file_name)
+            open(path, 'w').close()
+
         def build_side_effect():
             open(os.path.join(plugin.builddir, 'setup.py'), 'w').close()
+            os.mkdir(os.path.join(plugin.builddir, 'dist'))
+            open(os.path.join(
+                plugin.builddir, 'dist', 'package.tar'), 'w').close()
 
         mock_base_build.side_effect = build_side_effect
 
@@ -268,8 +299,10 @@ class PythonPluginTestCase(tests.TestCase):
         plugin.build()
         mock_run.assert_has_calls(calls)
 
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
     @mock.patch.object(python.PythonPlugin, 'run')
-    def test_pip_with_url(self, mock_run):
+    def test_pip_with_url(self, mock_run, mock_run_output):
         self.options.requirements = 'https://test.com/requirements.txt'
         self.options.constraints = 'http://test.com/constraints.txt'
 
@@ -304,12 +337,15 @@ class PythonPluginTestCase(tests.TestCase):
             '-bin/wheel',
             '-**/__pycache__',
             '-**/*.pyc',
+            '-lib/python*/site-packages/*/RECORD'
         ]
         fileset = plugin.snap_fileset()
         self.assertListEqual(expected_fileset, fileset)
 
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
     @mock.patch.object(python.PythonPlugin, 'run')
-    def test_build_fixes_python_shebangs(self, run_mock):
+    def test_build_fixes_python_shebangs(self, run_mock, mock_run_output):
         if self.options.python_version == 'python2':
             py_version_short = 'python2'
         elif self.options.python_version == 'python3':
@@ -355,10 +391,12 @@ class PythonPluginTestCase(tests.TestCase):
         for file_info in files:
             with open(os.path.join(plugin.installdir,
                                    file_info['path']), 'r') as f:
-                self.assertEqual(f.read(), file_info['expected'])
+                self.assertThat(f.read(), Equals(file_info['expected']))
 
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
     @mock.patch.object(python.PythonPlugin, 'run')
-    def test_process_dependency_links(self, run_mock):
+    def test_process_dependency_links(self, run_mock, mock_run_output):
         self.options.process_dependency_links = True
         plugin = python.PythonPlugin('test-part', self.options,
                                      self.project_options)
@@ -373,7 +411,8 @@ class PythonPluginTestCase(tests.TestCase):
         python._replicate_owner_mode('/nonexistant_path')
         self.assertFalse(mock_os_stat.called)
 
-    @mock.patch.object(python.PythonPlugin, 'run_output')
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
     @mock.patch.object(python.PythonPlugin, 'run')
     @mock.patch.object(python.snapcraft.BasePlugin, 'build')
     def test_build_creates_correct_sitecustomize(
@@ -405,3 +444,176 @@ class PythonPluginTestCase(tests.TestCase):
         site_path = glob(os.path.join(
             plugin.installdir, 'usr', 'lib', 'python*', 'sitecustomize.py'))[0]
         self.assertThat(site_path, FileContains(expected_sitecustomize))
+
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
+    @mock.patch.object(python.PythonPlugin, 'run')
+    def test_use_staged_python(self, run_mock, run_output_mock):
+        self.useFixture(fixture_setup.CleanEnvironment())
+
+        plugin = python.PythonPlugin('test-part', self.options,
+                                     self.project_options)
+
+        setup_directories(plugin, self.options.python_version)
+        # Create the necessary hints to detect a staged python
+        staged_python_bin = os.path.join(
+            plugin.project.stage_dir, 'usr', 'bin', 'python3')
+        os.makedirs(os.path.dirname(staged_python_bin))
+        open(staged_python_bin, 'w').close()
+        staged_python_include = os.path.join(
+            plugin.project.stage_dir, 'usr', 'include', 'python3.7')
+        os.makedirs(staged_python_include)
+        plugin.pull()
+
+        pip_command = [
+            os.path.join(plugin.project.stage_dir, 'usr', 'bin', 'python3'),
+            '-m', 'pip', 'download', '--disable-pip-version-check',
+            '--dest', os.path.join(plugin.partdir, 'packages'), '.'
+        ]
+        cwd = plugin.sourcedir
+        env = {
+            'PYTHONUSERBASE': plugin.installdir,
+            'PYTHONHOME': os.path.join(plugin.project.stage_dir, 'usr'),
+            'PATH': '{}/usr/bin:$PATH'.format(plugin.installdir),
+            'CPPFLAGS': '-I{}'.format(os.path.join(
+                plugin.project.stage_dir, 'usr', 'include', 'python3.7'))
+        }
+        run_mock.assert_called_once_with(pip_command, cwd=cwd, env=env)
+
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
+    @mock.patch.object(python.PythonPlugin, 'run')
+    def test_use_staged_python_extra_cppflags(self, run_mock, run_output_mock):
+        self.useFixture(fixture_setup.CleanEnvironment())
+        # Add some extra CPPFLAGS into the environment
+        self.useFixture(fixtures.EnvironmentVariable(
+            'CPPFLAGS', '-I/opt/include'))
+
+        plugin = python.PythonPlugin('test-part', self.options,
+                                     self.project_options)
+
+        setup_directories(plugin, self.options.python_version)
+        # Create the necessary hints to detect a staged python
+        staged_python_bin = os.path.join(
+            plugin.project.stage_dir, 'usr', 'bin', 'python3')
+        os.makedirs(os.path.dirname(staged_python_bin))
+        open(staged_python_bin, 'w').close()
+        staged_python_include = os.path.join(
+            plugin.project.stage_dir, 'usr', 'include', 'python3.7')
+        os.makedirs(staged_python_include)
+
+        plugin.pull()
+
+        pip_command = [
+            os.path.join(plugin.project.stage_dir, 'usr', 'bin', 'python3'),
+            '-m', 'pip', 'download', '--disable-pip-version-check',
+            '--dest', os.path.join(plugin.partdir, 'packages'), '.'
+        ]
+        cwd = plugin.sourcedir
+        env = {
+            'PYTHONUSERBASE': plugin.installdir,
+            'PYTHONHOME': os.path.join(plugin.project.stage_dir, 'usr'),
+            'PATH': '{}/usr/bin:$PATH'.format(plugin.installdir),
+            'CPPFLAGS': '-I{} -I/opt/include'.format(os.path.join(
+                plugin.project.stage_dir, 'usr', 'include', 'python3.7'))
+        }
+        run_mock.assert_called_once_with(pip_command, cwd=cwd, env=env)
+
+    @mock.patch.object(python.PythonPlugin, 'run_output')
+    @mock.patch.object(python.PythonPlugin, 'run')
+    def test_get_manifest_with_python_packages(self, _, mock_run_output):
+        def run_output_side_effect(*args, **kwargs):
+            if 'list' in args[0]:
+                return ('[{"name": "testpackage1", "version": "1.0"},'
+                        '{"name": "testpackage2", "version": "1.2"}]')
+            else:
+                return ''
+        mock_run_output.side_effect = run_output_side_effect
+
+        plugin = python.PythonPlugin('test-part', self.options,
+                                     self.project_options)
+        setup_directories(plugin, self.options.python_version)
+        plugin.build()
+        self.assertThat(
+            plugin.get_manifest(), Equals(
+                collections.OrderedDict(
+                    {'python-packages':
+                     ['testpackage1=1.0', 'testpackage2=1.2']})))
+
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
+    @mock.patch.object(python.PythonPlugin, 'run')
+    def test_get_manifest_with_local_requirements(self, _, mock_run_output):
+        self.options.requirements = 'requirements.txt'
+        plugin = python.PythonPlugin('test-part', self.options,
+                                     self.project_options)
+        setup_directories(plugin, self.options.python_version)
+        requirements_path = os.path.join(plugin.sourcedir, 'requirements.txt')
+        with open(requirements_path, 'w') as requirements_file:
+            requirements_file.write('testpackage1==1.0\n')
+            requirements_file.write('testpackage2==1.2')
+
+        plugin.build()
+
+        self.assertThat(
+            plugin.get_manifest()['requirements-contents'],
+            Equals('testpackage1==1.0\ntestpackage2==1.2'))
+
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
+    @mock.patch.object(python.PythonPlugin, 'run')
+    def test_get_manifest_with_local_constraints(self, _, mock_run_output):
+        self.options.constraints = 'constraints.txt'
+
+        plugin = python.PythonPlugin('test-part', self.options,
+                                     self.project_options)
+        setup_directories(plugin, self.options.python_version)
+        constraints_path = os.path.join(plugin.sourcedir, 'constraints.txt')
+        with open(constraints_path, 'w') as constraints_file:
+            constraints_file.write('testpackage1==1.0\n')
+            constraints_file.write('testpackage2==1.2')
+
+        plugin.build()
+
+        self.assertThat(
+            plugin.get_manifest()['constraints-contents'],
+            Equals('testpackage1==1.0\ntestpackage2==1.2'))
+
+
+class PythonPluginWithURLTestCase(
+        BasePythonPluginTestCase, tests.FakeFileHTTPServerBasedTestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.source = 'http://{}:{}/{}'.format(
+            *self.server.server_address, 'testfile.txt')
+
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
+    @mock.patch.object(python.PythonPlugin, 'run')
+    def test_get_manifest_with_requirements_url(self, _, mock_run_output):
+        self.options.requirements = self.source
+        plugin = python.PythonPlugin('test-part', self.options,
+                                     self.project_options)
+        setup_directories(plugin, self.options.python_version)
+
+        plugin.build()
+
+        self.assertThat(
+            plugin.get_manifest()['requirements-contents'],
+            Equals('Test fake file'))
+
+    @mock.patch.object(
+        python.PythonPlugin, 'run_output', side_effect=fake_empty_pip_list)
+    @mock.patch.object(python.PythonPlugin, 'run')
+    def test_get_manifest_with_constraints_url(self, _, mock_run_output):
+        self.options.constraints = self.source
+        plugin = python.PythonPlugin('test-part', self.options,
+                                     self.project_options)
+        setup_directories(plugin, self.options.python_version)
+
+        plugin.build()
+
+        self.assertThat(
+            plugin.get_manifest()['constraints-contents'],
+            Equals('Test fake file'))

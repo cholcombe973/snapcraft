@@ -1,3 +1,514 @@
+snapcraft (2.34) xenial; urgency=medium
+
+  [ Sergio Schvezov ]
+  * core: cache FileBase entries when a checksum is provided (#1433)
+  * cli: better error message for missing mksquashfs (#1481)
+  * core: improve source caching logic (#1486)
+  * ci: speedup the CLA check (#1503)
+  * ci: disable the travis deploy stage for docs (#1510)
+  * vcs: ignore .vscode project settings (#1517)
+  * docs: add github processed templates (#1514)
+  * tour: remove the tour assets (#1520)
+  * project: introduce build-snaps (#1518)
+  * tests: update the meson test to latest meson requirements (#1532)
+  * jhbuild plugin: remove dependency on pkgconf (#1535)
+  * nodejs plugin: add prefix --prefix to global pkg add (#1539)
+  * New upstream release (LP: #1715399)
+
+  [ Christian Dywan ]
+  * lxd: clean with no parts should only delete (#1434)
+  * lxd: inject snapcraft and core snaps into the container (#1364)
+  * lxd: wait on lock files before running apt commands (#1435)
+  * kbuild plugin: support Makefiles without an install target (#1432)
+  * kbuild plugin: move over the cross-compiling logic from the kernel plugin (#1417)
+  * lxd: path cannot have extra forward slashes (#1483)
+  * lxd: always remove existing device for project folder (#1488)
+  * lifecycle: outdated step should raise SnapcraftError (#1513)
+  * errors: introduce ContainerError (#1505)
+  * lxd: LXD not installed when using remote (#1516)
+  * lxd: use a unique temporary folder (#1519)
+
+  [ Leo Arias ]
+  * recording: record the original snapcraft.yaml (#1407)
+  * ci: skip the CLA check for pull requests from the bot (#1482)
+  * docs: fix typo in plugin help (#1496)
+  * python plugin: record manifest (#1487)
+  * tests: use assertThat instead of assertEqual (#1501)
+  * python plugin: always record constraints and requirements contents (#1521)
+  * demos: update the name of the remote mqtt part (#1533)
+
+  [ Kyle Fazzari ]
+  * options: properly handle missing compiler prefix (#1425)
+  * catkin plugin: include-roscore is a boolean (#1472)
+  * catkin plugin: default to release build (#1470)
+  * catkin plugin: rosinstall-files is a pull property (#1473)
+  * catkin plugin: support passing args to cmake (#1471)
+  * catkin plugin: extract rosdep into new package (#1392)
+  * cli: add global exception handler
+  * cli: stop handling exceptions in lifecycle
+  * plugins: use exceptions based on SnapcraftError
+  * cli: stop handling exceptions in parts
+  * cli: stop handling exceptions in assertions
+  * cli: stop handling exceptions in store
+  * many: use exceptions based on SnapcraftError
+  * rosdep: add support for multiple dependency types (#1479)
+  * errors: use function for exit code (#1491)
+  * cli: don't raise from excepthook (#1495)
+  * repo: make errors based on SnapcraftError (#1499)
+  * project loader: refactor into package (#1504)
+  * grammar: move into project_loader (#1500)
+  * many: simplify plugin loading (#1507)
+  * schema: version should have a max length of 32 (#1508)
+  * project_loader: process stage package grammar (#1509)
+  * project_loader: support grammar on build-packages (#1511)
+
+  [ Alex T Newman ]
+  * windows: add cx_Freeze options targeting bin/snapcraft (#1478)
+
+  [ Michael Vogt ]
+  * meta: add `base` as a type and top level property (#1419)
+
+  [ Adam Collard ]
+  * ant plugin, gradle plugin: add support for authenticated proxies (#1490)
+
+  [ fmanea ]
+  * demos: remove the unnecessary wrapper from the java demo (#1494)
+
+  [ Neal Gompa (ニール・ゴンパ) ]
+  * repo: use os-release(5) to detect supported Linux distributions (#1527)
+
+  [ Daniel Llewellyn ]
+  * jhbuild plugin: new plugin (#1298)
+  * jhbuild plugin: fix UnboundLocalError for chmod_path (#1534)
+
+ -- Sergio Schvezov <sergio.schvezov@ubuntu.com>  Wed, 06 Sep 2017 14:04:53 +0000
+
+snapcraft (2.33) xenial; urgency=medium
+
+  [ Sergio Schvezov ]
+  * tests: reduce the amount of test code in test_meta (#1391)
+  * meta: bash completion support (#1390)
+  * tests: fix issues with python 3.6 (#1398)
+  * cleanbuild: ensure we enter a shell on failures on --debug (#1404)
+  * tests: do not break a systems `bzr whoami` (#1357)
+  * snap: remove completer entry (#1409)
+  * core: minimal cross OS support. (#1413)
+  * core: a clean command should clean. (#1416)
+  * nodejs plugin: copy the content of out of tree symlinks (#1418)
+  * tests: adapt opencv's test expectations (#1426)
+  * New upstream release (LP: #1707060)
+
+  [ Zygmunt Krynicki ]
+  * pluginhandler: don't clobber path on local import failure (#1361)
+
+  [ Paolo Pisati ]
+  * core: use the correct kernel arch for s390 (#1376)
+
+  [ Tim Süberkrüb ]
+  * core: support yaml merge tags (#1384)
+
+  [ roxd ]
+  * schema: blank version should not be allowed in snapcraft.yaml (#1379)
+
+  [ Paolo Pisati ]
+  * kernel plugin: add a default target per powerpc, ppc64el and s390x (#1377)
+
+  [ Rex Tsai ]
+  * tests: mock download for rustup in the x-compile test. (#1396)
+
+  [ Evan Dandrea ]
+  * file_utils: handle I/O errors in os.link (#1369)
+  * python plugin: correct capitalisation for PyPI. (#1401)
+  * python plugin: better explain dependency link processing (#1402)
+
+  [ Leo Arias ]
+  * python plugin: output json in pip list (#1393)
+  * tests: allow to filter tests in docker (#1375)
+  * tests: document the test suites in the snapcraft repo (#1394)
+  * recording: rename the file to manifest.yaml (#1406)
+  * pluginhandler: check for collisions only in existing files (#1405)
+  * tests: run the tests in travis using LXD containers (#1415)
+  * tests: build the snapcraft snap in travis tests (#1411)
+  * ci: remove the old script to run with lxc (#1422)
+
+  [ Christian Dywan ]
+  * cli: proper parsing of hidden options (#1378)
+  * core: clean the container on a full clean (#1372)
+  * lxd: do not assume user ID of 1000 for raw.idmap (#1385)
+  * autotools plugin: Enable cross-compilation support (#1383)
+  * lxd: distingish FileNotFoundError for when not installed (#1400)
+  * waf plugin: enable cross-compilation support  (#1397)
+  * ci: wait for apt/dpkg lock when setting lxd up (#1421)
+  * lxd: stop setting `$HOME` in containers (#1408)
+  * lxd: only remove container if one exists (#1403)
+
+  [ Simon Davy ]
+  * meta: add support for `reload-command` (#1373)
+
+ -- Sergio Schvezov <sergio.schvezov@ubuntu.com>  Thu, 27 Jul 2017 20:19:01 +0000
+
+snapcraft (2.32) xenial; urgency=medium
+
+  [ Michał Sawicz ]
+  * autotools plugin: don't force uniqueness on configflags (#1337)
+
+  [ filibtester ]
+  * integrations: use the snapcore/snapcraft docker image in travis (#1331)
+
+  [ Jonathan Cave ]
+  * sources: allow source-type to specify local (#1352)
+
+  [ Christian Dywan ]
+  * tests: run unit tests on Travis with mock armhf (#1316)
+  * rust plugin: add support for cross-compilation (#1350)
+
+  [ Gustavo Silva ]
+  * deltas: improved message returned when delta is too big (#1345)
+
+  [ Adam Collard ]
+  * cli: add --version command (#1366)
+
+  [ Sergio Schvezov ]
+  * cli: provide a whoami command (#1332)
+
+  [ Kyle Fazzari ]
+  * cli: stop leaking green text (#1360)
+  * catkin plugin: add support for ROS Lunar (#1367)
+
+  [ Leo Arias ]
+  * tests: use pyramid as a router for the fake servers (#1363)
+  * tests: set up the spread execution in linode (#1374)
+  * integrations: add the snapcraft Dockerfile (#1370)
+  * tests: refactor the travis jobs using stages (#1318)
+
+ -- Kyle Fazzari <kyle@canonical.com>  Fri, 23 Jun 2017 10:00:19 -0700
+
+snapcraft (2.31) xenial; urgency=medium
+
+  [ Sergio Schvezov ]
+  * storeapi: resume snap downloads (#1330)
+  * cli: remove double congrats messaging (#1351)
+  * cli: do not duplicate errors (#1347)
+  * cli: default options for the implicit snap command (#1353)
+  * go plugin: filter the main packages when go-packages are defined (#1355)
+  * New upstream release 2.31 (LP: #1692102)
+
+  [ Colin Watson ]
+  * store: send X-Ubuntu-Series, not X-Ubuntu-Release (#1320)
+
+  [ Kyle Fazzari ]
+  * docs: improve onboarding experience (#1336)
+  * catkin plugin: add support for rosinstall files (#1314)
+  * common: find data files via sys.prefix (#1356)
+
+  [ Tim Süberkrüb ]
+  * qmake plugin: set default qt version (#1328)
+  * tour: use https for source urls (#1329)
+
+  [ Leo Arias ]
+  * tests: small updates for manual kernel tests (#1327)
+  * tests: use the fake apt cache in deb unit tests (#1334)
+  * state: save all the build packages as global (#1340)
+
+  [ Michał Sawicz ]
+  * sources: don't use --remote for updating git submodules (#1344)
+
+  [ Christian Dywan ]
+  * go plugin: add support for cross-compilation (#1338)
+  * go plugin: cross compile with CGo (#1343)
+  * plugins: clarify wording of cross-compilation unsupported error (#1349)
+
+ -- Sergio Schvezov <sergio.schvezov@canonical.com>  Wed, 07 Jun 2017 22:51:40 -0300
+
+snapcraft (2.30) xenial; urgency=medium
+
+  [ Sergio Schvezov ]
+  * cli: new UI and internal refactor (#1307)
+  * cli: proper error for failed snap command (#1325)
+  * Revert "tests: remove the reusable parts tour test (#1321)" (#1324)
+  * store: collaboration UI for snaps (#1288)
+  * New upstream release 2.30 (LP: #1692102)
+
+  [ Leo Arias ]
+  * tests: initial setup for the snapcraft snap tests with spread (#1272)
+  * misc: rename the snap dir variable to prime dir (#1279)
+  * recording: save the snapcraft.yaml in the resulting snap (#1278)
+  * tests: minor cleanups on the spread tests (#1287)
+  * tests: refactor tests with build and stage packages (#1290)
+  * parts: remove the deprecated snap keyword from the internal representation (#1282)
+  * tests: fix the recording tests to work in multiple architectures (#1292)
+  * recording: record stage packages installed in the snap (#1293)
+  * recording: record build packages installed in the snap (#1295)
+  * tests: increase the staging registration limit to 100 (#1271)
+  * tests: use C.UTF-8 for the docker locale (#1310)
+  * state: save the dependencies of build packages (#1299)
+  * recording: record global build-packages installed on the host (#1306)
+  * state: fix the name of the source details (#1312)
+  * meta: read and write the desktop file with utf-8 encoding (#1309)
+  * cleanbuild: set the container language to C.UTF-8 (#1304)
+  * tests: remove the reusable parts tour test (#1321)
+  * recording: save the details of the source pulled (#1317)
+  * state: ignore the 'any' architecture in the build packages apt cache (#1322)
+  * state: search for the build package that provides a virtual package (#1323)
+
+  [ Facundo Batista ]
+  * store: support for channel branches in responses for release, close, and status (#1280)
+
+  [ Christian Dywan ]
+  * lxd: pass through commands into the container (#1263)
+  * lxd: setup image and target arch for cross-compilation (#1286)
+  * lxd: support the architectures field from older LXDs (#1305)
+  * lxd: mock platform in the FakeLXD fixture (#1315)
+
+  [ Paolo Pisati ]
+  * kernel plugin: learn how to assemble the ubuntu config using kconfigflavour (#1285)
+  * kernel plugin: slightly improve the messaging of check_config() (#1303)
+  * kernel plugin: do not warn about DMIID in config check (#1319)
+  * kernel_plugin: use CROSS_COMPILE to override the default toolchain (#1242)
+  * cli: allow uts machine arch as a valid --target-arch option (#1204)
+  * kernel plugin: verify kernel config is correct (#1223)
+
+  [ Tim Süberkrüb ]
+  * sources: add support for 7-zip files (#1168)
+
+  [ JulianLiu ]
+  * meson plugin: add a plugin for meson build system (#1294)
+
+  [ roxd ]
+  * rust plugin: use of source-subdir without failing on pull (#1296)
+  
+  [ edvega ]
+  * sources: validate unknown source-type in yaml (#1297)
+
+  [ Ricardo N Feliciano ]
+  * docs: add missing VCS dependencies to HACKING.md (#1311)
+  * cli: allow capital Y to accept the dev agreement (#1308)
+
+ -- Sergio Schvezov <sergio.schvezov@canonical.com>  Fri, 19 May 2017 17:39:34 -0300
+
+snapcraft (2.29) xenial; urgency=medium
+
+  [ Sergio Schvezov ]
+  * store: better retry strategy for GETs. (#1212)
+  * docs: remove docs and link to snappy-docs. (#1227)
+  * nodejs plugin: switch to the newer LTS. (#1228)
+  * pluginhandler: exclude `/snap/` from libraries. (#1231)
+  * nodejs plugin: switch to the newer LTS. (#1228) (#1232)
+  * core: find the correct libraries as a snap. (#1234)
+  * snap: use the gpg tarball instead of git://. (#1236)
+  * docs: update contribution guide. (#1233)
+  * repo: enable elementary. (#1237)
+  * cli: improve push output. (#1240)
+  * ci: split plugin integration tests out. (#1252)
+  * nodejs plugin: add support for yarn. (#1245)
+  * ci: fix travis ordering for locales generation. (#1254)
+  * core: support running from other operating systems. (#1257)
+  * meta: version from git support. (#1260)
+  * shell_utils: code cleanup (#1265)
+  * meta: override the version with version-script. (#1267)
+  * tests: fix package version pinning tests. (#1269)
+  * New upstream release 2.29 (LP: #1684965)
+
+  [ Joe Talbott ]
+  * tests: Fix staging store test for Tracks. (#1225)
+  * pluginhandler: factor out state bits into the state package. (#1221)
+  * repo: track per-part build-packages. (#1193)
+  * sources: add VCS asset tracking (#1229)
+
+  [ Facundo Batista ]
+  * store: better check of the error code in StatusTracker. (#1226)
+
+  [ Leo Arias ]
+  * tests: add arm64 to the nightly tests (#1210)
+  * tests: update name registration window limit test. (#1224)
+  * ci: update the location of the upstream retry autopkgtests script. (#1243)
+  * tests: use launchpad as the source of the compressed test snap (#1259)
+
+  [ Jumpei Ogawa ]
+  * repo: enable KDE Neon. (#1244)
+
+  [ Kyle Fazzari ]
+  * catkin plugin: create completely valid environment (#1239)
+
+  [ edvega ]
+  * help: replace dashes with underscores when printing plugins help (#1241)
+  * cli: remove empty lines in the unclean parts message (#1251)
+
+  [ Celso Providelo ]
+  * store: new registration errors and test update. (#1247)
+
+  [ Christian Dywan ]
+  * lxd: refactor Cleanbuilder into Containerbuild and add Project. (#1230)
+
+  [ Parameswaran Sivatharman ]
+  * store: plumbing for collaboration support. (#1246)
+
+  [ Colin Watson ]
+  * ant plugin: honour proxy configuration (#1256)
+
+  [ Chris MacNaughton ]
+  * rust plugin: update plugin to set RUSTFLAGS (#1255)
+
+  [ Andy Li ]
+  * docs: fixed links to doc. (#1250)
+  * tests: report coverage only in unit tests. (#1266)
+
+ -- Sergio Schvezov <sergio.schvezov@ubuntu.com>  Thu, 20 Apr 2017 13:57:08 -0300
+
+snapcraft (2.28) xenial; urgency=medium
+
+  [ Sergio Schvezov ]
+  * python plugin: use stage headers if applicable. (#1156)
+  * docs: use correct target to generate docs. (#1159)
+  * packaging: snapcraft as a snap (#1158)
+  * tour: make it work when its a snap. (#1217)
+  * cleanbuild: don't copy cache into container. (#1216)
+  * kernel plugin: fix modprobe output parsing. (#1208)
+  * kernel plugin: use default per arch targets. (#1209)
+  * python plugin: support pbr/setup.cfg projects. (#1202)
+  * cleanbuild: packaging independent detection. (#1199)
+  * tests: remove repo.Ubuntu patch for plugins. (#1194)
+  * store: enable delta uploads by default. (#1196)
+  * repo: refactor into a package. (#1192)
+  * core: resolve ld link first. (#1189)
+  * store: enable retries for store calls. (#1184)
+  * New upstream release 2.28 (LP: #1675391)
+
+  [ Joe Talbott ]
+  * store: set User-Agent header in store requests. (#1188)
+  * store: Add track support to commands. (#1161)
+  * state: asset tracking - store versions of stage-packages. (#1142)
+  * store: remove 'Series' from channel map output (#1151)
+  * repo: support versioned stage-packages. (#1157)
+  * parser: use the project loader code to find the origin's snapcraft.yaml (#1141)
+  * cli: rename `history` to 'list-revisions' with `revisions` alias. (#1160)
+  * repo: add version support for build-packages (#1185)
+  * project: use a more likely to be found global build-package (#1218)
+
+  [ Paolo Pisati ]
+  * demos:  add the minimal config changes to boot a dragonboard410c (#1147)
+  * kernel plugin: if no dtb target is set when the arch is arm.* build them all. (#1148)
+  * kernel plugin: rework MAKEFLAGS from the environment (#1150)
+
+  [ Kyle Fazzari ]
+  * contribution guide: add commit message template (#1153)
+  * demos: make ROS demos support exiting after success. (#1201)
+  * catkin plugin: support building with an underlay. (#1140)
+  * demos: add ROS content sharing demo. (#1186)
+  * repo: fixup with python, not sed (#1181)
+  * repo: ignore symlinks to libc. (#1174)
+  * sources: update documentation for source-subdir (#1177)
+
+  [ Olivier Tilloy ]
+  * project: expose parallel_build_count to scriptlets. (#1154)
+
+  [ Leo Arias ]
+  * docs: build and push the API docs to github pages. (#1126)
+  * tests: pass the autopkgtest secret to the container (#1162)
+  * tests: update the ftp source for integration test (#1169)
+  * ci: install wget in the container that triggers the beta tests. (#1167)
+  * demos: add a message to exit the mosquitto subscriber. (#1173)
+  * demos: add the mount-observe plug to be able to run godd. (#1172)
+  * tests: support bzr branches for external tests. (#1128)
+  * docs: update the directory where the API pages are generated (#1163)
+  * demos: remove the tomcat demo snap. (#1176)
+  * tests: make the kernel unit tests architecture independent. (#1178)
+  * tests: support snap directory in external tests (#1180)
+  * tests: run the master tests against the staging server (#1164)
+  * tests: take into account the new current link. (#1187)
+  * ci: run the CLA check in a docker container. (#1191)
+  * tests: add manual tests for the kernel snaps (#1198)
+  * ci: allow to run individual autopkgtest suites (#1200)
+  * tests: expect failures for the tests that can't be run in arm64. (#1145)
+
+  [ Jonathan Cave ]
+  * plainbox-provider plugin: run validate (#1095)
+
+  [ Michael Hudson-Doyle ]
+  * core: fix symlink resolution in get_core_dynamic_linker. (#1170)
+
+  [ pachulo ]
+  * sources: add optional "source-checksum" property (#980)
+
+  [ Colin Watson ]
+  * godeps plugin: add git to build-packages. (#1179)
+
+ -- Sergio Schvezov <sergio.schvezov@canonical.com>  Thu, 23 Mar 2017 16:11:14 -0300
+
+snapcraft (2.27.1) xenial; urgency=medium
+
+  [ Kyle Fazzari ]
+  * catkin plugin: produce build-ready staging area. (#1130)
+
+  [ Leo Arias ]
+  * ci: trigger beta tests on travis every day. (#1144)
+
+  [ Joe Talbott ]
+  * store: switch Track and Arch in the channel map display. (#1143)
+
+  [ Sergio Schvezov ]
+  * Revert "repo: remove symlinks to libc. (#1100)" (#1146)
+  * New upstream release 2.27.1 (LP: #1665759)
+
+ -- Sergio Schvezov <sergio.schvezov@ubuntu.com>  Fri, 17 Feb 2017 19:58:48 +0000
+
+snapcraft (2.27) xenial; urgency=medium
+
+  [ Sergio Schvezov ]
+  * core: switch to using rpath for clasic confinement. (#1094)
+  * python plugin: do the right thing with classic. (#1093)
+  * meta: support for the environment keyword. (#1103)
+  * meta: correct the deprecation for `setup/gui` use. (#1107)
+  * tests: avoid snapping progress to leak into report. (#1114)
+  * core: setup core to support classic confinement. (#1112)
+  * cleanbuild: allow talking to a remote. (#1121)
+  * plainbox-provider plugin: filter out sitecustomize. (#1139)
+  * New upstream release 2.27 (LP: #1663229)
+
+  [ Kyle Fazzari ]
+  * schema,copy plugin: better errors when item has no value. (#1096)
+  * cleanbuild: include snap directory in tarball. (#1102)
+  * repo: remove symlinks to libc. (#1100)
+  * catkin plugin: don't pass args to setup.sh. (#1099)
+  * pluginhandler: support more complex stage-packages. (#1059)
+  * repo: cache stage packages for faster future use. (#1122)
+
+  [ Leo Arias ]
+  * tests: do not rely on project_dir. (#1078)
+  * lifecycle: print the command needed to clean the dirty part (#1097)
+  * tests: check the CLA on all the commits. (#1106)
+  * tests: rename the integration test snaps. (#1105)
+  * misc: consistently use a dash for copyright years. (#1101)
+  * tests: rename the waf test snap. (#1111)
+  * ci: fix the env vars passed to the docker container in travis. (#1125)
+  * python plugin: exclude the RECORD files. (#1138)
+
+  [ Marco Trevisan ]
+  * meta: properly get the icon extension from splitted name. (#1092)
+  * tests: fix or ignore PEP8 static errors. (#1085)
+
+  [ John Lenton ]
+  * ux: print the version on startup when running with --debug (#1086)
+
+  [ Dan Chapman ]
+  * qbs plugin: add plugin support for the Qt Build Suite (qbs). (#1079)
+
+  [ Bayard Randel ]
+  * store: implement delta uploads in push. (#940)
+
+  [ Joe Talbott ]
+  * store: expose store errors to the cli. (#1110)
+  * Make git pulls less error prone due to history changes. (#1052)
+  * store: add support for tracks in channels. (#1108)
+
+  [ MZN Lab ]
+  * meta: allow `post-stop-command` for an app entry in `apps`. (#1109)
+
+  [ Loïc Minier ]
+  * kernel plugin: fix kernel snap layout (#1115)
+
+ -- Sergio Schvezov <sergio.schvezov@ubuntu.com>  Thu, 09 Feb 2017 12:55:44 +0000
+
 snapcraft (2.26) xenial; urgency=medium
 
   [ Sergio Schvezov ]

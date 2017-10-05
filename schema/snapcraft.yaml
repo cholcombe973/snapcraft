@@ -1,15 +1,39 @@
 $schema: http://json-schema.org/draft-04/schema#
 
+definitions:
+  grammar-array:
+    type: array
+    minitems: 1
+    uniqueItems: true
+    items:
+      anyOf:
+        - type: string
+          usage: "<string>"
+        - type: object
+          usage: "on <selector>[,<selector>...]:"
+          additionalProperties: false
+          patternProperties:
+            ^on\s+.+$:
+              $ref: "#/definitions/grammar-array"
+        - type: object
+          usage: "try:"
+          additionalProperties: false
+          patternProperties:
+            ^try$:
+              $ref: "#/definitions/grammar-array"
+        - type: object
+          usage: "else:"
+          additionalProperties: false
+          patternProperties:
+            ^else$:
+              $ref: "#/definitions/grammar-array"
+
 title: snapcraft schema
 type: object
 properties:
   build-packages:
-    type: array
+    $ref: "#/definitions/grammar-array"
     description: top level build packages.
-    minItems: 1
-    uniqueItems: true
-    items:
-      - type: string
   name:
     type: string
     description: name of the snap package
@@ -25,7 +49,11 @@ properties:
     # python's defaul yaml loading code loads 1.0 as an int
     # type: string
     description: package version
-    pattern: "^[a-zA-Z0-9.+~-]*$"
+    pattern: "^[a-zA-Z0-9.+~-]+$"
+    maxLength: 32
+  version-script:
+    type: string
+    description: a script that echoes the version to set.
   icon:
     type: string
     description: path to a 512x512 icon representing the package.
@@ -49,6 +77,7 @@ properties:
     description: the snap type, the implicit type is 'app'
     enum:
       - app
+      - base
       - gadget
       - kernel
       - os
@@ -73,6 +102,9 @@ properties:
     enum:
       - stable
       - devel
+  base:
+    type: string
+    description: the base snap to use
   epoch:
     description: the snap epoch, used to specify upgrade paths
     format: epoch
@@ -96,6 +128,7 @@ properties:
         dependencies:
           stop-command: ["daemon"]
           post-stop-command: ["daemon"]
+          reload-command: ["daemon"]
         additionalProperties: false
         properties:
           desktop:
@@ -104,6 +137,9 @@ properties:
           command:
             type: string
             description: command executed to run the binary
+          completer:
+            type: string
+            description: bash completion script relative to the prime directory
           stop-command:
             type: string
             description: command executed to stop a service
@@ -112,6 +148,8 @@ properties:
             description: command executed after stopping a service
           stop-timeout:
             description: timeout in seconds
+          reload-command:
+            description: command executed to reload a service
           daemon:
             type: string
             description: signals that the app is a service.
@@ -156,6 +194,11 @@ properties:
                 - type: string
                   minLength: 1
                 - type: number
+          adapter:
+            type: string
+            description: What kind of wrapper to generate for the given command
+            enum:
+              - none
   hooks:
     type: object
     additionalProperties: false
@@ -191,6 +234,9 @@ properties:
           source:
             type: string
             default: '.'
+          source-checksum:
+              type: string
+              default: ''
           source-branch:
             type: string
             default: ''
@@ -209,6 +255,19 @@ properties:
           source-type:
             type: string
             default: ''
+            enum:
+              - bzr
+              - git
+              - hg
+              - mercurial
+              - subversion
+              - svn
+              - tar
+              - zip
+              - deb
+              - rpm
+              - 7z
+              - local
           disable-parallel:
             type: boolean
             default: false
@@ -220,25 +279,24 @@ properties:
               type: string
             default: []
           stage-packages:
-            type: array
-            minitems: 1
-            uniqueItems: true
-            items:
-              type: string
-            default: []
+            $ref: "#/definitions/grammar-array"
+            default: [] # For some reason this doesn't work if in the ref
+          build-snaps:
+            $ref: "#/definitions/grammar-array"
+            default: [] # For some reason this doesn't work if in the ref
           build-packages:
-            type: array
-            minitems: 1
-            uniqueItems: true
-            items:
-              type: string
-            default: []
+            $ref: "#/definitions/grammar-array"
+            default: [] # For some reason this doesn't work if in the ref
           build-attributes:
             type: array
             minitems: 1
             uniqueItems: true
             items:
               type: string
+              enum:
+                - no-system-libraries
+                - no-install
+                - debug
             default: []
           organize:
             type: object

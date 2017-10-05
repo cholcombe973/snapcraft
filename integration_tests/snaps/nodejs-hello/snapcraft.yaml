@@ -7,7 +7,12 @@ description: |
   Make a new one.
 confinement: strict
 
-parts:
+apps:
   nodejs-hello:
-    plugin: nodejs
+    command: nodejs-hello
+    plugs: [network]
+
+parts:
+  nodejs-part:
     source: .
+    plugin: nodejs

@@ -39,7 +39,7 @@ import os
 import glob
 
 import snapcraft
-
+from snapcraft.internal import errors
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,8 @@ class CopyPlugin(snapcraft.BasePlugin):
         for src in globs:
             paths = glob.glob(os.path.join(self.builddir, src))
             if not paths:
-                raise EnvironmentError('no matches for {!r}'.format(src))
+                raise errors.SnapcraftEnvironmentError(
+                    'no matches for {!r}'.format(src))
             for path in paths:
                 filepaths.update(
                     {os.path.join(self.builddir, path): globs[src]})
@@ -115,7 +116,9 @@ def _link_or_copy(source, destination, boundary):
         destination_dirname = os.path.dirname(destination)
         normalized = os.path.normpath(os.path.join(destination_dirname, link))
         if os.path.isabs(link) or not normalized.startswith(boundary):
-            follow_symlinks = True
+            # Only follow symlinks that are NOT pointing at libc (LP: #1658774)
+            if link not in snapcraft.repo.Repo.get_package_libraries('libc6'):
+                follow_symlinks = True
 
     snapcraft.common.link_or_copy(source, destination,
                                   follow_symlinks=follow_symlinks)
